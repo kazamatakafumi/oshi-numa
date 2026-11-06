@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>推し沼深度計</title>
-<meta name="description" content="10問で、あなたが推しの沼のどのくらい深くにいるかを水深で測ります。">
+<meta name="description" content="推しの沼、いま水深何m？ 全10問で測る、推し活の深さ診断。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="推し沼深度計">
+<meta property="og:title" content="推し沼深度計">
+<meta property="og:description" content="推しの沼、いま水深何m？ 全10問で測る、推し活の深さ診断。">
+<meta property="og:url" content="https://kazamatakafumi.github.io/oshi-numa/">
+<meta property="og:image" content="https://kazamatakafumi.github.io/oshi-numa/ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="推し沼深度計">
+<meta name="twitter:description" content="推しの沼、いま水深何m？ 全10問で測る、推し活の深さ診断。">
+<meta name="twitter:image" content="https://kazamatakafumi.github.io/oshi-numa/ogp.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Kaku+Gothic+Antique:wght@400;500;700;900&family=DotGothic16&display=swap" rel="stylesheet">
@@ -281,6 +293,8 @@ h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0
 // 楽天アフィリエイトID（例: 1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b）。空のままだと報酬なしの普通のリンクになる
 const RAKUTEN_AFFILIATE_ID = "5929b1bc.4327dd8d.5929b1bd.8b33a2e8";
 const SHARE_HASHTAG = "推し沼深度計";
+// 公開URL。シェアするときは結果の深さ別ページ（r/1〜5.html）を使い、Xに深さ別の画像が出るようにする
+const SITE_URL = "https://kazamatakafumi.github.io/oshi-numa/";
 
 /* ===== データ ===== */
 const GENRES = [
@@ -520,7 +534,7 @@ function renderResult() {
   $("rType").textContent = TYPES[r.t].name;
   $("rTypeDesc").textContent = TYPES[r.t].desc;
 
-  const url = location.href.split("#")[0];
+  const url = `${SITE_URL}r/${ZONES.indexOf(r.z) + 1}.html`;
   const text = shareText(r);
   $("shareX").href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${encodeURIComponent(SHARE_HASHTAG)}`;
   $("shareLine").href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
@@ -560,7 +574,8 @@ document.addEventListener("click", async (e) => {
 $("startBtn").addEventListener("click", () => { state.idx = 0; state.answers = []; state.order = newOrder(); show("quiz"); });
 $("retryBtn").addEventListener("click", () => { state.answers = []; state.idx = 0; show("start"); });
 $("copyBtn").addEventListener("click", async () => {
-  const text = `${shareText(resultData())}\n#${SHARE_HASHTAG}\n${location.href.split("#")[0]}`;
+  const r = resultData();
+  const text = `${shareText(r)}\n#${SHARE_HASHTAG}\n${SITE_URL}r/${ZONES.indexOf(r.z) + 1}.html`;
   try { await navigator.clipboard.writeText(text); $("toast").textContent = "コピーした！"; }
   catch { $("toast").textContent = "コピーできなかったので、スクショでどうぞ"; }
 });
