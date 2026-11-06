@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推し沼深度計</title>
+<meta name="description" content="10問で、あなたが推しの沼のどのくらい深くにいるかを水深で測ります。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Kaku+Gothic+Antique:wght@400;500;700;900&family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+/* 水深計: 画面そのものが海。答えるほど背景が深く暗くなり、左の深度ゲージを推し色の光が沈んでいく */
+:root {
+  --sea: #1f8ea3;            /* JSで深さに応じて書き換える */
+  --ink: #f4fbfd;
+  --ink-soft: rgba(244, 251, 253, .72);
+  --line: rgba(244, 251, 253, .22);
+  --panel: rgba(3, 12, 24, .28);
+  --oshi: #ff6fb5;           /* 推し色。開始画面で選ぶ */
+  --font-display: "Yusei Magic", "Hiragino Maru Gothic ProN", sans-serif;   /* うちわに手書きした感じ */
+  --font-body: "Zen Kaku Gothic Antique", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;  /* 少し古いかなの角ゴ。同人誌っぽい手ざわり */
+  --font-meter: "DotGothic16", ui-monospace, monospace;                    /* ダイブコンピューターの液晶 */
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+html { background: var(--sea); transition: background-color 1.2s ease; }
+body {
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.18)) fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.7;
+  transition: background-color 1.2s ease;
+  overflow-x: hidden;
+}
+.app {
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 20px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+/* ---- 深度ゲージ ---- */
+.gauge {
+  position: sticky; top: 16px;
+  height: min(78vh, 620px);
+  display: grid; grid-template-columns: 10px 1fr; gap: 8px;
+}
+.gauge__bar {
+  position: relative; border-radius: 6px;
+  background: linear-gradient(180deg, #8fe3ef 0%, #1f8ea3 22%, #12405e 48%, #0a1a33 74%, #03050c 100%);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.gauge__marker {
+  position: absolute; left: 50%; top: 0;
+  width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+  background: var(--oshi);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 18px 4px var(--oshi);
+  transition: top 1.2s cubic-bezier(.3,.7,.2,1);
+}
+.gauge__ticks { position: relative; font-family: var(--font-meter); font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.gauge__ticks span { position: absolute; left: 0; transform: translateY(-50%); white-space: nowrap; }
+.gauge__ticks span::before { content: ""; display: inline-block; width: 6px; height: 1px; background: var(--line); vertical-align: middle; margin-right: 3px; }
+
+/* ---- 本文 ---- */
+main { min-width: 0; }
+.q, .zone, .lead, .card p, .gear strong { word-break: auto-phrase; }
+.eyebrow { font-size: 14px; color: var(--ink-soft); margin: 0 0 6px; }
+/* タイトル: 推し色のネオン看板 */
+h1 {
+  font-family: var(--font-display); font-weight: 400;
+  font-size: min(10.4vw, 92px); line-height: 1; white-space: nowrap;
+  display: inline-block; margin: 12px 0 30px; padding: .22em .32em .26em;
+  color: #fff;
+  border: .07em solid var(--oshi); border-radius: .28em;
+  outline: 2px solid rgba(255,255,255,.55); outline-offset: .12em;
+  background: rgba(3, 10, 22, .42);
+  box-shadow: 0 0 .5em var(--oshi), inset 0 0 .45em var(--oshi);
+  text-shadow: 0 0 .08em #fff, 0 0 .3em var(--oshi), 0 0 .7em var(--oshi);
+  position: relative;
+  animation: neon-on 1.4s ease-out both, neon-pulse 1.6s 1.4s ease-in-out infinite alternate;
+}
+/* 看板のまわりの電球。白とピンクの2重の点線を交互に点滅させて、ぐるぐる回っているように見せる */
+h1::before, h1::after {
+  content: ""; position: absolute; inset: -.2em; border-radius: .38em; pointer-events: none;
+  border: .075em dotted #fff;
+  filter: drop-shadow(0 0 .08em #fff) drop-shadow(0 0 .14em var(--oshi));
+  animation: bulbs .5s steps(1) infinite;
+}
+h1::after { inset: -.235em; border-color: var(--oshi); animation-delay: .25s; }
+@keyframes bulbs { 0% { opacity: 1; } 50% { opacity: .1; } }
+@keyframes neon-pulse {
+  from { box-shadow: 0 0 .35em var(--oshi), inset 0 0 .3em var(--oshi); }
+  to   { box-shadow: 0 0 .9em var(--oshi), 0 0 1.8em var(--oshi), inset 0 0 .6em var(--oshi); }
+}
+h1 em { font-style: normal; color: var(--oshi); text-shadow: 0 0 .1em #fff, 0 0 .35em var(--oshi), 0 0 .8em var(--oshi); }
+@keyframes neon-on {
+  0%, 18%, 26%, 40% { opacity: .25; box-shadow: none; }
+  22%, 32%, 100% { opacity: 1; }
+}
+.lead { font-size: 18px; font-weight: 700; max-width: 34em; margin: 0 0 28px; }
+h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0 0 10px; }
+.block { margin: 0 0 26px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font: inherit; font-size: 15px; color: var(--ink);
+  padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: #0a1a33; border-color: var(--ink); font-weight: 700; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch {
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(255,255,255,.35); background: var(--c);
+  box-shadow: 0 0 12px -2px var(--c);
+}
+.swatch[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 3px; }
+.swatch-name { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+
+.btn {
+  font: inherit; font-weight: 700; font-size: 17px; cursor: pointer;
+  padding: 14px 28px; border-radius: 999px; border: 0;
+  background: var(--oshi); color: #0a0f1d;
+  box-shadow: 0 0 24px -4px var(--oshi);
+}
+.btn--ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); box-shadow: none; font-weight: 500; }
+.btn:focus-visible, .chip:focus-visible, .swatch:focus-visible, .opt:focus-visible, a:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+/* ---- 質問 ---- */
+.progress { display: flex; justify-content: space-between; font-family: var(--font-meter); font-size: 15px; color: var(--ink-soft); margin-bottom: 12px; }
+.q { font-family: var(--font-display); font-weight: 400; font-size: clamp(25px, 6vw, 34px); line-height: 1.4; margin: 0 0 22px; text-wrap: balance; }
+.opts { display: grid; gap: 10px; }
+.opt {
+  font: inherit; font-size: 16px; font-weight: 700; text-align: left; color: var(--ink); cursor: pointer;
+  padding: 14px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+  display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start;
+}
+.opt:hover { border-color: var(--oshi); }
+.opt b { font-family: var(--font-meter); font-weight: 400; color: var(--oshi); }
+.back { margin-top: 18px; }
+
+/* ---- 結果 ---- */
+.depth {
+  font-family: var(--font-meter); font-weight: 400; line-height: 1;
+  font-size: clamp(60px, 17vw, 112px); margin: 4px 0 8px; color: var(--oshi); text-shadow: 0 0 22px var(--oshi);
+}
+.depth small { font-size: .38em; margin-left: 4px; }
+.zone { font-family: var(--font-display); font-size: 30px; margin: 0 0 4px; line-height: 1.3; }
+.zone span { color: var(--ink); }
+.zone small { display: block; font-size: 15px; font-weight: 500; color: var(--ink-soft); }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+  padding: 18px; margin: 18px 0;
+}
+.card p { margin: 0 0 8px; }
+.card p:last-child { margin-bottom: 0; }
+.meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 15px; margin: 14px 0 0; }
+.meta div { display: grid; gap: 2px; }
+.meta dt { color: var(--ink-soft); font-size: 13px; }
+.meta dd { margin: 0; font-weight: 700; font-size: 17px; }
+.share { display: flex; flex-wrap: wrap; gap: 10px; }
+.share a, .share button { text-decoration: none; }
+.toast { font-size: 14px; color: var(--ink-soft); min-height: 1.5em; margin-top: 6px; }
+
+.gear { display: grid; gap: 10px; }
+.gear a {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  padding: 14px 16px; border-radius: 14px; text-decoration: none; color: var(--ink);
+  background: rgba(255,255,255,.07); border: 1px solid var(--line);
+}
+.gear a:hover { border-color: var(--oshi); }
+.gear strong { font-size: 16px; }
+.gear span { grid-column: 1; font-size: 14px; color: var(--ink-soft); }
+.gear i { grid-row: 1 / span 2; grid-column: 2; font-style: normal; font-size: 14px; color: var(--oshi); white-space: nowrap; }
+.pr { font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 0; }
+
+[hidden] { display: none !important; }
+
+/* 泡 */
+.bubbles { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
+.bubbles i {
+  position: absolute; bottom: -20px; width: var(--s); height: var(--s); left: var(--x);
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.35);
+  animation: rise var(--d) linear infinite; animation-delay: var(--delay);
+}
+@keyframes rise { to { transform: translateY(-110vh) translateX(12px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .bubbles { display: none; }
+  body, html, .gauge__marker { transition: none; }
+  h1, h1::before, h1::after { animation: none; }
+}
+
+@media (max-width: 480px) {
+  .app { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding-top: 18px; }
+  .gauge { grid-template-columns: 8px 1fr; gap: 4px; }
+  .gauge__ticks { font-size: 9.5px; }
+  .gauge__ticks span::before { display: none; }
+  .meta { grid-template-columns: 1fr; gap: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="bubbles" aria-hidden="true"></div>
+
+<div class="app">
+  <aside class="gauge" aria-label="現在の水深">
+    <div class="gauge__bar"><div class="gauge__marker" id="marker"></div></div>
+    <div class="gauge__ticks" id="ticks"></div>
+  </aside>
+
+  <main>
+    <!-- 開始 -->
+    <section id="start">
+      <h1>推し<em>沼</em>深度計</h1>
+      <p class="lead">推しの沼、いま水深何m？<br>全10問で測ります。</p>
+
+      <div class="block">
+        <h2>推しはどこの人？</h2>
+        <div class="chips" id="genres" role="group" aria-label="推しのジャンル"></div>
+      </div>
+
+      <div class="block">
+        <h2>推し色</h2>
+        <div class="swatches" id="swatches" role="group" aria-label="推し色"></div>
+        <div class="swatch-name" id="swatchName"></div>
+      </div>
+
+      <button class="btn" id="startBtn" type="button">潜る</button>
+    </section>
+
+    <!-- 質問 -->
+    <section id="quiz" hidden>
+      <div class="progress"><span id="qNum"></span><span id="qDepth"></span></div>
+      <p class="q" id="qText"></p>
+      <div class="opts" id="opts"></div>
+    </section>
+
+    <!-- 結果 -->
+    <section id="result" hidden>
+      <p class="eyebrow" id="rGenre"></p>
+      <p class="depth" id="rDepth"></p>
+      <p class="zone" id="rZone"></p>
+
+      <div class="card">
+        <p id="rDesc"></p>
+        <dl class="meta">
+          <div><dt>同じ深さにいる生き物</dt><dd id="rCreature"></dd></div>
+          <div><dt>潜り方</dt><dd id="rType"></dd></div>
+        </dl>
+        <p id="rTypeDesc" style="margin-top:10px"></p>
+      </div>
+
+      <div class="block">
+        <h2>友だちにも測らせる</h2>
+        <div class="share">
+          <a class="btn" id="shareX" href="#">Xでシェア</a>
+          <a class="btn btn--ghost" id="shareLine" href="#">LINEで送る</a>
+          <button class="btn btn--ghost" id="copyBtn" type="button">コピー</button>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+      </div>
+
+      <div class="block">
+        <h2 id="gearTitle">装備リスト</h2>
+        <div class="gear" id="gear"></div>
+        <p class="pr">PR｜楽天アフィリエイトのリンクです。ここから買うと、これを作った人にちょっとだけお金が入ります。</p>
+      </div>
+
+      <button class="btn btn--ghost" id="retryBtn" type="button">もう一回潜る</button>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===== 設定 ===== */
+// 楽天アフィリエイトID（例: 1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b）。空のままだと報酬なしの普通のリンクになる
+const RAKUTEN_AFFILIATE_ID = "5929b1bc.4327dd8d.5929b1bd.8b33a2e8";
+const SHARE_HASHTAG = "推し沼深度計";
+
+/* ===== データ ===== */
+const GENRES = [
+  { id: "idol",   label: "アイドル",          live: "ライブ",       goods: "グッズ" },
+  { id: "band",   label: "バンド・歌手",      live: "ライブ",       goods: "グッズ" },
+  { id: "anime",  label: "アニメ・ゲーム",    live: "イベント",     goods: "グッズ" },
+  { id: "vtuber", label: "VTuber・配信者",    live: "配信",         goods: "グッズ" },
+  { id: "stage",  label: "俳優・舞台",        live: "舞台",         goods: "グッズ" },
+  { id: "sports", label: "スポーツ",          live: "試合",         goods: "グッズ" },
+  { id: "owarai", label: "お笑い",            live: "ライブ",       goods: "グッズ" },
+  { id: "other",  label: "その他",            live: "イベント",     goods: "グッズ" },
+];
+
+const COLORS = [
+  ["赤", "#ff4d5e"], ["ピンク", "#ff6fb5"], ["オレンジ", "#ff9a3c"], ["黄", "#ffe14d"],
+  ["緑", "#4be08a"], ["水色", "#5ad1ff"], ["青", "#5b82ff"], ["紫", "#b06bff"], ["白", "#ffffff"],
+];
+
+// 各選択肢: [文, 深さ点(0-3), {タイプ点}]  タイプ: field=現場 / collect=収集 / preach=布教 / stream=配信
+const QUESTIONS = [
+  { q: "推しの新情報、解禁されたら？", o: [
+    ["気づいたら次の日だった", 0],
+    ["その日のうちには見る", 1, { stream: 1 }],
+    ["通知きた瞬間、全部の手が止まる", 2, { stream: 1 }],
+    ["解禁時間にアラームかけて正座待機", 3, { stream: 2 }],
+  ]},
+  { q: "{live}、遠征だったら行く？", o: [
+    ["近場なら…", 0],
+    ["隣の県まではいける", 1, { field: 1 }],
+    ["新幹線も飛行機もふつうに取る", 2, { field: 2 }],
+    ["海外も行く。パスポート切らしたことない", 3, { field: 3 }],
+  ]},
+  { q: "同じ{goods}、何個買う？", o: [
+    ["そもそもあんまり買わない", 0],
+    ["1個で満足", 1, { collect: 1 }],
+    ["使う用・飾る用・保存用", 2, { collect: 2 }],
+    ["ランダムは推しが出るまで積む", 3, { collect: 3 }],
+  ]},
+  { q: "スマホのロック画面は？", o: [
+    ["買ったときのまま", 0],
+    ["推し", 1],
+    ["推し。ホームもアイコンも推し", 2, { preach: 1 }],
+    ["ケースも推し色。スマホごと祭壇", 3, { collect: 1, preach: 1 }],
+  ]},
+  { q: "1か月の推し活費は？", o: [
+    ["ほぼ0", 0],
+    ["数千円", 1],
+    ["数万円", 2],
+    ["給料日、口座の中身がほぼ推しに還元される", 3],
+  ]},
+  { q: "推しの話をふられたら？", o: [
+    ["聞かれたら少しだけ", 0],
+    ["5分はしゃべる", 1, { preach: 1 }],
+    ["画像と動画つきのプレゼンが始まる", 2, { preach: 2 }],
+    ["布教用に円盤とかグッズ渡したことある", 3, { preach: 3 }],
+  ]},
+  { q: "推しの映像や配信、どれくらい見る？", o: [
+    ["気が向いたら", 0],
+    ["なるべくリアタイ", 1, { stream: 1 }],
+    ["リアタイして、アーカイブでもう1周", 2, { stream: 2 }],
+    ["切り抜きも見返しも全部追ってる", 3, { stream: 3 }],
+  ]},
+  { q: "チケット落ちたら？", o: [
+    ["まあいっか", 0],
+    ["次の抽選に出す", 1, { field: 1 }],
+    ["一般もリセールも全部張りつく", 2, { field: 2 }],
+    ["その日一日、なにも手につかない", 3, { field: 2 }],
+  ]},
+  { q: "部屋に推しスペースある？", o: [
+    ["特にない", 0],
+    ["写真とかがちょっとだけ", 1, { collect: 1 }],
+    ["棚ひとつ推し専用", 2, { collect: 2 }],
+    ["部屋ごと祭壇。人呼ぶとき説明いる", 3, { collect: 3 }],
+  ]},
+  { q: "来年の予定、どうやって決めてる？", o: [
+    ["推しとは関係なく決める", 0],
+    ["推しの予定もちょっと気にする", 1],
+    ["推しの日程が出てから有給とる", 2],
+    ["推しのスケジュールがそのまま自分の1年", 3],
+  ]},
+];
+
+// 区分は実際の海の層と同じ
+const ZONES = [
+  { max: 10,    name: "浅瀬",     sub: "まだ足つく",               creature: "ヤドカリ",
+    desc: "まだ足つく。推しがいると毎日ちょっと楽しい、くらいのいい距離感。でも潮が満ちるのは一瞬なので気をつけて。" },
+  { max: 200,   name: "有光層",   sub: "光はまだ届く",             creature: "ウミガメ",
+    desc: "もう足はつかない。気づけば週末が推しの予定で埋まりはじめてる。まだ明るいので引き返せます。たぶん。" },
+  { max: 1000,  name: "中深層",   sub: "ほぼ真っ暗",               creature: "ホタルイカ",
+    desc: "太陽の光はもう届かない。推しの光だけで生きていける体になってきた。自分で光れるのでホタルイカ認定。" },
+  { max: 6000,  name: "深海層",   sub: "水圧、地上の100倍以上",     creature: "チョウチンアンコウ",
+    desc: "ふつうの人ならつぶれる水圧に、平気な顔で耐えてる。推し色の光をぶら下げて、暗くても迷わず推しのとこに行ける。" },
+  { max: Infinity, name: "超深海層", sub: "マリアナ海溝の底が見える", creature: "シンカイクサウオ",
+    desc: "海でいちばん深いところ（約10,920m）まであと少し。ここまで来る人はほとんどいない。もう推しと同じリズムで息してる。" },
+];
+
+const TYPES = {
+  field:   { name: "遠征ダイバー型",   desc: "会いに行ってなんぼ。移動距離＝愛。" },
+  collect: { name: "宝物コレクター型", desc: "推しのものは手元に置いときたい。部屋がだんだん海底神殿になっていく。" },
+  preach:  { name: "沼の案内人型",     desc: "自分だけ沈むのはもったいない派。気づいたら周りもだいたい沈んでる。" },
+  stream:  { name: "深夜リアタイ型",   desc: "情報も配信も最速で浴びたい。睡眠時間はだいたい推しに持ってかれてる。" },
+};
+
+// タイプ別の装備（楽天市場の検索結果へリンク）
+const GEAR = {
+  field: [
+    ["大容量のモバイルバッテリー", "電子チケ出せないのがいちばんこわい", "モバイルバッテリー 大容量 軽量"],
+    ["ライブ用の双眼鏡", "天井席でも表情までいける", "双眼鏡 ライブ 防振"],
+    ["機内持ち込みのキャリー", "1〜2泊の遠征ならこれひとつ", "キャリーケース 機内持ち込み 軽量"],
+    ["遠征の宿をおさえる", "会場の近くはすぐ埋まる", null, "https://travel.rakuten.co.jp/"],
+  ],
+  collect: [
+    ["缶バッジの収納ファイル", "傷つけずにずらっと並べられる", "缶バッジ 収納 ファイル"],
+    ["アクスタのケース", "ほこりから守りつつ飾れる", "アクリルスタンド ケース 透明"],
+    ["コレクションケース", "棚を正式な祭壇に格上げ", "コレクションケース LED"],
+    ["痛バッグ", "集めたやつを連れて歩ける", "痛バッグ"],
+  ],
+  preach: [
+    ["スマホのフォトプリンター", "推しの写真をその場で刷って配れる", "スマホ フォトプリンター"],
+    ["小型プロジェクター", "家で布教上映会ができる", "プロジェクター 小型 家庭用"],
+    ["スマホ三脚", "グッズの写真が一気にそれっぽくなる", "スマホ 三脚 自撮り棒"],
+    ["うちわの文字シール", "ファンサをもらいにいく準備", "うちわ 文字 シール"],
+  ],
+  stream: [
+    ["ノイキャンのイヤホン", "推しの声以外いらない", "ノイズキャンセリング ワイヤレスイヤホン"],
+    ["寝ながらスマホスタンド", "深夜リアタイで首をやらないように", "スマホスタンド 寝ながら アーム"],
+    ["10インチくらいのタブレット", "配信は大きい画面で浴びたい", "タブレット 10インチ"],
+    ["ブルーライトカットのメガネ", "夜通し見る人の必需品", "ブルーライトカット メガネ"],
+  ],
+};
+
+/* ===== 状態 ===== */
+let state = { view: "start", genre: "idol", color: 1, idx: 0, answers: [], order: [] };
+
+/* 選択肢の並びを毎回シャッフル（4番目がいつも一番深い、にならないように） */
+function shuffled(n) {
+  const a = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function newOrder() { return QUESTIONS.map((q) => shuffled(q.o.length)); }
+
+const $ = (id) => document.getElementById(id);
+const genre = () => GENRES.find((g) => g.id === state.genre) || GENRES[0];
+const fill = (s) => s.replaceAll("{live}", genre().live).replaceAll("{goods}", genre().goods);
+
+/* 深さの計算: 0〜30点を、0.3m〜約10,900mの対数スケールに */
+const MAX_DEPTH = 10920;
+function scoreOf(answers) { return answers.reduce((a, i, k) => a + QUESTIONS[k].o[i][1], 0); }
+function depthOf(score) { return Math.min(MAX_DEPTH, 0.3 * Math.pow(10, (score / 30) * Math.log10(MAX_DEPTH / 0.3))); }
+function zoneOf(d) { return ZONES.find((z) => d <= z.max); }
+function typeOf(answers) {
+  const t = { field: 0, collect: 0, preach: 0, stream: 0 };
+  answers.forEach((i, k) => { const p = QUESTIONS[k].o[i][2] || {}; for (const key in p) t[key] += p[key]; });
+  return Object.keys(t).reduce((a, b) => (t[b] > t[a] ? b : a), "field");
+}
+function fmtDepth(d) { return d < 10 ? d.toFixed(1) : Math.round(d).toLocaleString("ja-JP"); }
+
+/* ゲージ上の位置（対数） */
+function gaugePos(d) { return Math.log10(Math.max(d, 0.3) / 0.3) / Math.log10(MAX_DEPTH / 0.3); }
+
+/* 深さに応じた海の色 */
+const SEA = [[0, [31, 142, 163]], [.35, [20, 92, 128]], [.6, [14, 50, 86]], [.8, [8, 24, 50]], [1, [3, 6, 15]]];
+function seaColor(p) {
+  for (let i = 1; i < SEA.length; i++) {
+    if (p <= SEA[i][0]) {
+      const [p0, c0] = SEA[i - 1], [p1, c1] = SEA[i];
+      const t = (p - p0) / (p1 - p0);
+      return `rgb(${c0.map((v, k) => Math.round(v + (c1[k] - v) * t)).join(",")})`;
+    }
+  }
+  return "rgb(3,6,15)";
+}
+
+function setDepthVisual(d) {
+  const p = gaugePos(d);
+  $("marker").style.top = (p * 100) + "%";
+  document.documentElement.style.setProperty("--sea", seaColor(p));
+}
+
+/* 途中の深さ: ここまでの合計点で潜っていく */
+function runningDepth() {
+  return state.answers.length ? depthOf(scoreOf(state.answers)) : 0.3;
+}
+
+/* ===== 描画 ===== */
+function renderTicks() {
+  const marks = [[0.3, "0m"], [10, "10m"], [200, "200m"], [1000, "1,000m"], [6000, "6,000m"], [MAX_DEPTH, "10,920m"]];
+  $("ticks").innerHTML = marks.map(([d, l]) => `<span style="top:${gaugePos(d) * 100}%">${l}</span>`).join("");
+}
+
+function renderStart() {
+  $("genres").innerHTML = GENRES.map((g) =>
+    `<button class="chip" type="button" id="g-${g.id}" aria-pressed="${g.id === state.genre}" data-g="${g.id}">${g.label}</button>`).join("");
+  $("swatches").innerHTML = COLORS.map(([n, c], i) =>
+    `<button class="swatch" type="button" id="c-${i}" style="--c:${c}" aria-label="${n}" aria-pressed="${i === state.color}" data-c="${i}"></button>`).join("");
+  $("swatchName").textContent = "推し色：" + COLORS[state.color][0];
+  document.documentElement.style.setProperty("--oshi", COLORS[state.color][1]);
+}
+
+function renderQuiz() {
+  const k = state.idx, item = QUESTIONS[k];
+  $("qNum").textContent = `Q${k + 1} / ${QUESTIONS.length}`;
+  $("qDepth").textContent = `いま ${fmtDepth(runningDepth())}m`;
+  $("qText").textContent = fill(item.q);
+  if (!state.order[k]) state.order[k] = shuffled(item.o.length);
+  $("opts").innerHTML = state.order[k].map((i, pos) =>
+    `<button class="opt" type="button" id="o-${pos}" data-i="${i}"><b>${pos + 1}</b><span>${fill(item.o[i][0])}</span></button>`).join("");
+  setDepthVisual(runningDepth());
+}
+
+function rakutenUrl(keyword, direct) {
+  const target = direct || `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(keyword)}/`;
+  if (!RAKUTEN_AFFILIATE_ID) return target;
+  return `https://hb.afl.rakuten.co.jp/hgc/${RAKUTEN_AFFILIATE_ID}/?pc=${encodeURIComponent(target)}&m=${encodeURIComponent(target)}`;
+}
+
+function resultData() {
+  const score = scoreOf(state.answers);
+  const d = depthOf(score);
+  const z = zoneOf(d);
+  const t = typeOf(state.answers);
+  return { score, d, z, t };
+}
+
+function shareText(r) {
+  return `推し沼、水深${fmtDepth(r.d)}mでした【${r.z.name}】\n${r.z.creature}と同じ深さの${TYPES[r.t].name}らしい。みんな何m？`;
+}
+
+function renderResult() {
+  const r = resultData();
+  $("rGenre").textContent = `${genre().label}沼の測定結果`;
+  $("rDepth").innerHTML = `${fmtDepth(r.d)}<small>m</small>`;
+  $("rZone").innerHTML = `<span>${r.z.name}</span><small>${r.z.sub}</small>`;
+  $("rDesc").textContent = r.z.desc;
+  $("rCreature").textContent = r.z.creature;
+  $("rType").textContent = TYPES[r.t].name;
+  $("rTypeDesc").textContent = TYPES[r.t].desc;
+
+  const url = location.href.split("#")[0];
+  const text = shareText(r);
+  $("shareX").href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${encodeURIComponent(SHARE_HASHTAG)}`;
+  $("shareLine").href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  $("toast").textContent = "";
+
+  $("gearTitle").textContent = `${TYPES[r.t].name}の装備リスト`;
+  $("gear").innerHTML = GEAR[r.t].map(([name, why, kw, direct]) =>
+    `<a href="${rakutenUrl(kw, direct)}" target="_blank" rel="noopener sponsored"><strong>${name}</strong><span>${why}</span><i>${direct ? "楽天トラベル" : "楽天で見る"} →</i></a>`).join("");
+
+  setDepthVisual(r.d);
+}
+
+function show(view) {
+  state.view = view;
+  for (const v of ["start", "quiz", "result"]) $(v).hidden = v !== view;
+  if (view === "start") { renderStart(); setDepthVisual(0.3); }
+  if (view === "quiz") renderQuiz();
+  if (view === "result") renderResult();
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+/* ===== 操作 ===== */
+document.addEventListener("click", async (e) => {
+  const g = e.target.closest("[data-g]");
+  if (g) { state.genre = g.dataset.g; renderStart(); return; }
+  const c = e.target.closest("[data-c]");
+  if (c) { state.color = +c.dataset.c; renderStart(); return; }
+  const o = e.target.closest("[data-i]");
+  if (o && state.view === "quiz") {
+    state.answers[state.idx] = +o.dataset.i;
+    state.answers.length = state.idx + 1;
+    if (state.idx < QUESTIONS.length - 1) { state.idx++; renderQuiz(); }
+    else show("result");
+    return;
+  }
+});
+$("startBtn").addEventListener("click", () => { state.idx = 0; state.answers = []; state.order = newOrder(); show("quiz"); });
+$("retryBtn").addEventListener("click", () => { state.answers = []; state.idx = 0; show("start"); });
+$("copyBtn").addEventListener("click", async () => {
+  const text = `${shareText(resultData())}\n#${SHARE_HASHTAG}\n${location.href.split("#")[0]}`;
+  try { await navigator.clipboard.writeText(text); $("toast").textContent = "コピーした！"; }
+  catch { $("toast").textContent = "コピーできなかったので、スクショでどうぞ"; }
+});
+
+/* 泡 */
+(function bubbles() {
+  const box = document.querySelector(".bubbles");
+  let html = "";
+  for (let i = 0; i < 14; i++) {
+    const s = 4 + Math.random() * 12;
+    html += `<i style="--s:${s}px;--x:${Math.random() * 100}%;--d:${9 + Math.random() * 10}s;--delay:${-Math.random() * 15}s"></i>`;
+  }
+  box.innerHTML = html;
+})();
+
+/* 起動（再公開時は途中の状態を引き継ぐ） */
+function start(saved) {
+  if (saved && saved.view) state = Object.assign(state, saved);
+  renderTicks();
+  renderStart();
+  show(state.view);
+}
+window.claude?.hot?.snapshot?.(() => state);
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
