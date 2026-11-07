@@ -179,6 +179,13 @@ h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0
 .share a, .share button { text-decoration: none; }
 .toast { font-size: 14px; color: var(--ink-soft); min-height: 1.5em; margin-top: 6px; }
 
+.vs-banner {
+  display: inline-block; margin: -10px 0 26px; padding: 10px 16px; border-radius: 14px;
+  background: var(--panel); border: 1px dashed var(--oshi); font-weight: 700;
+}
+.vs-banner b, .vs b { font-family: var(--font-meter); font-weight: 400; color: var(--oshi); font-size: 1.15em; }
+.vs { border-color: var(--oshi); box-shadow: 0 0 18px -6px var(--oshi); }
+.vs .vs__head { font-family: var(--font-display); font-size: 26px; line-height: 1.35; margin-bottom: 6px; word-break: auto-phrase; }
 .gear { display: grid; gap: 10px; }
 .gear a {
   display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
@@ -230,6 +237,7 @@ h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0
     <section id="start">
       <h1>推し<em>沼</em>深度計</h1>
       <p class="lead">推しの沼、いま水深何m？<br>全10問で測ります。</p>
+      <p class="vs-banner" id="vsBanner" hidden></p>
 
       <div class="block">
         <h2>推しはどこの人？</h2>
@@ -258,6 +266,8 @@ h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0
       <p class="depth" id="rDepth"></p>
       <p class="zone" id="rZone"></p>
 
+      <div class="card vs" id="vsCard" hidden></div>
+
       <div class="card">
         <p id="rDesc"></p>
         <dl class="meta">
@@ -268,7 +278,7 @@ h2 { font-family: var(--font-body); font-weight: 900; font-size: 17px; margin: 0
       </div>
 
       <div class="block">
-        <h2>友だちにも測らせる</h2>
+        <h2>友だちに挑戦させる</h2>
         <div class="share">
           <a class="btn" id="shareX" href="#">Xでシェア</a>
           <a class="btn btn--ghost" id="shareLine" href="#">LINEで送る</a>
@@ -429,6 +439,14 @@ const GEAR = {
 /* ===== 状態 ===== */
 let state = { view: "start", genre: "idol", color: 1, idx: 0, answers: [], order: [] };
 
+/* 対決モード: シェアされたリンクに ?vs=水深 が付いていたら、その人と比べる */
+const VS = (() => {
+  try {
+    const v = parseFloat(new URLSearchParams(location.search).get("vs"));
+    return v >= 0.3 && v <= 10920 ? v : null;
+  } catch { return null; }
+})();
+
 /* 選択肢の並びを毎回シャッフル（4番目がいつも一番深い、にならないように） */
 function shuffled(n) {
   const a = [...Array(n).keys()];
@@ -492,6 +510,7 @@ function renderStart() {
   $("swatches").innerHTML = COLORS.map(([n, c], i) =>
     `<button class="swatch" type="button" id="c-${i}" style="--c:${c}" aria-label="${n}" aria-pressed="${i === state.color}" data-c="${i}"></button>`).join("");
   $("swatchName").textContent = "推し色：" + COLORS[state.color][0];
+  if (VS !== null) { $("vsBanner").hidden = false; $("vsBanner").innerHTML = `友だちの推し沼は 水深<b>${fmtDepth(VS)}m</b>。あなたはそれより深い？`; }
   document.documentElement.style.setProperty("--oshi", COLORS[state.color][1]);
 }
 
@@ -520,7 +539,21 @@ function resultData() {
   return { score, d, z, t };
 }
 
+function vsLine(r) {
+  if (VS === null) return null;
+  const diff = r.d - VS, abs = Math.abs(diff);
+  if (abs < 1) return { head: "友だちとほぼ同じ深さ。", body: "同じ海の同じあたりを漂っています。会えたら手を振ってください。", short: `友だち（${fmtDepth(VS)}m）とほぼ同じ深さでした` };
+  if (diff > 0) return { head: `友だちより <b>${fmtDepth(abs)}m</b> 深い。`, body: `友だちは水深${fmtDepth(VS)}m。あなたのほうが沈んでます。上から光が見えなくなってきたら本物です。`, short: `友だち（${fmtDepth(VS)}m）より${fmtDepth(abs)}m深かった` };
+  return { head: `友だちより <b>${fmtDepth(abs)}m</b> 浅い。`, body: `友だちは水深${fmtDepth(VS)}m。あなたの頭上にはまだ光があります。追いかけるかどうかは、あなたしだい。`, short: `友だち（${fmtDepth(VS)}m）より${fmtDepth(abs)}m浅かった` };
+}
+
+function shareUrl(r) {
+  return `${SITE_URL}r/${ZONES.indexOf(r.z) + 1}.html?vs=${Math.round(r.d * 10) / 10}`;
+}
+
 function shareText(r) {
+  const v = vsLine(r);
+  if (v) return `${v.short}。推し沼、水深${fmtDepth(r.d)}m【${r.z.name}】\nこの水深に挑んでみて`;
   return `推し沼、水深${fmtDepth(r.d)}mでした【${r.z.name}】\n${r.z.creature}と同じ深さの${TYPES[r.t].name}らしい。みんな何m？`;
 }
 
@@ -534,7 +567,10 @@ function renderResult() {
   $("rType").textContent = TYPES[r.t].name;
   $("rTypeDesc").textContent = TYPES[r.t].desc;
 
-  const url = `${SITE_URL}r/${ZONES.indexOf(r.z) + 1}.html`;
+  const url = shareUrl(r);
+  const v = vsLine(r);
+  $("vsCard").hidden = !v;
+  if (v) $("vsCard").innerHTML = `<p class="vs__head">${v.head}</p><p>${v.body}</p>`;
   const text = shareText(r);
   $("shareX").href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${encodeURIComponent(SHARE_HASHTAG)}`;
   $("shareLine").href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
@@ -575,7 +611,7 @@ $("startBtn").addEventListener("click", () => { state.idx = 0; state.answers = [
 $("retryBtn").addEventListener("click", () => { state.answers = []; state.idx = 0; show("start"); });
 $("copyBtn").addEventListener("click", async () => {
   const r = resultData();
-  const text = `${shareText(r)}\n#${SHARE_HASHTAG}\n${SITE_URL}r/${ZONES.indexOf(r.z) + 1}.html`;
+  const text = `${shareText(r)}\n#${SHARE_HASHTAG}\n${shareUrl(r)}`;
   try { await navigator.clipboard.writeText(text); $("toast").textContent = "コピーした！"; }
   catch { $("toast").textContent = "コピーできなかったので、スクショでどうぞ"; }
 });
