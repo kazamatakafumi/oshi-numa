@@ -31,9 +31,27 @@ function xLength(s) {
 const pct = (s) =>
   encodeURIComponent(s).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 
+// コピペで入りがちな前後の空白・改行を取り除く
+const env = (k) => (process.env[k] || '').trim();
+
+// キーの中身は出さずに、長さと形だけ表示する（入れ間違いの確認用）
+function describeKeys() {
+  const shape = (k) => {
+    const raw = process.env[k] || '';
+    const v = raw.trim();
+    const notes = [];
+    if (raw !== v) notes.push('前後に空白/改行あり→自動で除去');
+    if (/\s/.test(v)) notes.push('途中に空白あり');
+    if (k === 'X_ACCESS_TOKEN' && !/^\d+-/.test(v)) notes.push('「数字-」で始まっていない');
+    return `${k}: ${v.length}文字${notes.length ? '（' + notes.join('、') + '）' : ''}`;
+  };
+  return ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'].map(shape).join('\n');
+}
+
 async function postX(text) {
   const url = 'https://api.x.com/2/tweets';
-  const { X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET } = process.env;
+  const [X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET] =
+    ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'].map(env);
   const oauth = {
     oauth_consumer_key: X_API_KEY,
     oauth_nonce: crypto.randomBytes(16).toString('hex'),
@@ -62,7 +80,7 @@ async function postX(text) {
       : res.status === 402 ? '→ クレジット残高が足りない可能性'
       : res.status === 429 ? '→ 投稿しすぎ。時間をおいて再実行'
       : '';
-    throw new Error(`X ${res.status}: ${JSON.stringify(json)} ${hint}`);
+    throw new Error(`X ${res.status}: ${JSON.stringify(json)} ${hint}\n${describeKeys()}`);
   }
   return json.data?.id;
 }
